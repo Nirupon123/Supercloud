@@ -11,10 +11,9 @@ services:
       - MONGO_URI=mongodb+srv://uddalakmukhopadhyay:Uddalak2005@cluster0.fifwikr.mongodb.net/mern_buggy_app
       - JWT_SECRET=supersecret_cloud_test
       - NODE_ENV=production
-      - OTEL_SERVICE_NAME=backend-container
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://signoz-otel-collector:4318
-    depends_on:
-      - mongodb
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+      - OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:4318/v1/metrics
 
   frontend:
     build:
@@ -23,6 +22,7 @@ services:
       - "3000:80"
     environment:
       - REACT_APP_API_URL=http://localhost:3001/api
+      - SIGNOZ_OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/logs
     depends_on:
       - backend
 

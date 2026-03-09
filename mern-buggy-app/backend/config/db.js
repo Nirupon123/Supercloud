@@ -43,7 +43,7 @@ const connectDB = async () => {
       // [ERROR-7] serverSelectionTimeoutMS = 100ms is far too aggressive.
       // Cloud MongoDB (Atlas, DocumentDB) has ~few ms baseline latency.
       // Cross-region setups easily exceed 100ms, causing constant failures.
-      serverSelectionTimeoutMS: 100, // Should be: 5000 or 10000
+      serverSelectionTimeoutMS: 5000, // Should be: 5000 or 10000
 
       // No socketTimeoutMS set — once connected, a stalled query waits forever
     });
