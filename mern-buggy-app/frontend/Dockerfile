@@ -10,15 +10,10 @@ RUN npm install
 
 COPY . .
 # Ensure production build
-RUN npm run build
+RUN npm install
 
-# Stage 2: Serve the application with Nginx
-FROM nginx:stable-alpine
-
-# Copy build artifacts from build-stage to nginx public folder
-COPY --from=build-stage /app/build /usr/share/nginx/html
 
 # Expose port 80
-EXPOSE 80
+EXPOSE 3000
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["npm", "start"]

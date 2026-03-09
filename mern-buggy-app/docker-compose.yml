@@ -11,15 +11,15 @@ services:
       - MONGO_URI=mongodb+srv://uddalakmukhopadhyay:Uddalak2005@cluster0.fifwikr.mongodb.net/mern_buggy_app
       - JWT_SECRET=supersecret_cloud_test
       - NODE_ENV=production
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-      - OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://localhost:4318/v1/logs
-      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:4318/v1/metrics
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:4318
+      - OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://host.docker.internal:4318/v1/logs
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://host.docker.internal:4318/v1/metrics
 
   frontend:
     build:
       context: ./frontend
     ports:
-      - "3000:80"
+      - "3000:3000"
     environment:
       - REACT_APP_API_URL=http://localhost:3001/api
       - SIGNOZ_OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/logs
