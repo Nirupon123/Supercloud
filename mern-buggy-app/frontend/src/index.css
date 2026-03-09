@@ -1,0 +1,138 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f5f5f5;
+  color: #333;
+}
+
+.App {
+  min-height: 100vh;
+}
+
+.login-container,
+.register-container {
+  max-width: 400px;
+  margin: 80px auto;
+  padding: 40px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.login-container h2,
+.register-container h2 {
+  margin-bottom: 24px;
+  font-size: 24px;
+  color: #1a1a2e;
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #5a67d8;
+}
+
+button:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #e53e3e;
+  background: #fff5f5;
+  border: 1px solid #feb2b2;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.dashboard header {
+  background: #1a1a2e;
+  color: white;
+  padding: 16px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dashboard header button {
+  width: auto;
+  padding: 8px 20px;
+  background: transparent;
+  border: 1px solid white;
+}
+
+.role-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  text-transform: uppercase;
+  margin: 0 12px;
+}
+
+.role-admin { background: #f6e05e; color: #744210; }
+.role-user  { background: #9ae6b4; color: #22543d; }
+
+.product-list {
+  padding: 32px;
+}
+
+.product-list input {
+  max-width: 400px;
+  margin-bottom: 24px;
+}
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.product-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.product-card h3 {
+  margin-bottom: 8px;
+  color: #1a1a2e;
+}
+
+.product-card p {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.product-card button {
+  margin-top: 12px;
+  background: #e53e3e;
+  padding: 8px;
+  font-size: 13px;
+}
