@@ -4,17 +4,32 @@
   "description": "Buggy MERN backend for AIOps self-healing testing",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "start:cloud": "PORT=5000 NODE_ENV=production node server.js"
+    "start": "node --require ./otel.js server.js",
+    "dev": "node --require ./otel.js server.js",
+    "start:cloud": "PORT=5000 NODE_ENV=production node --require ./otel.js server.js"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.8.0",
+    "@opentelemetry/api-logs": "^0.51.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.46.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.51.1",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.51.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.51.1",
+    "@opentelemetry/instrumentation-winston": "^0.38.0",
+    "@opentelemetry/resources": "^1.24.1",
+    "@opentelemetry/sdk-logs": "^0.51.1",
+    "@opentelemetry/sdk-metrics": "^1.24.1",
+    "@opentelemetry/sdk-node": "^0.51.1",
+    "@opentelemetry/semantic-conventions": "^1.24.1",
+    "@opentelemetry/winston-transport": "^0.23.0",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.0",
-    "mongoose": "^7.3.1"
+    "mongoose": "^7.3.1",
+    "morgan": "^1.10.0",
+    "winston": "^3.11.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - MONGO_URI=mongodb+srv://uddalakmukhopadhyay:Uddalak2005@cluster0.fifwikr.mongodb.net/mern_buggy_app
+      - JWT_SECRET=supersecret_cloud_test
+      - NODE_ENV=production
+      - OTEL_SERVICE_NAME=backend-container
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://signoz-otel-collector:4318
+    depends_on:
+      - mongodb
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_API_URL=http://localhost:3001/api
+    depends_on:
+      - backend
+
+volumes:
+  mongodb_data:

@@ -25,6 +25,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const logger = require('./config/logger');
+const morgan = require('morgan');
 
 dotenv.config();
 
@@ -40,8 +41,9 @@ if (!PORT) {
   process.exit(1); // <- Kubernetes sees exit code 1, restarts pod immediately
 }
 
-app.use(cors());
+app.use(cors("*"));
 app.use(express.json());
+app.use(morgan('combined', { stream: logger.stream }));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -50,6 +52,40 @@ app.use('/health', require('./routes/health'));
 
 app.get('/', (req, res) => {
   res.json({ message: 'MERN App API Running' });
+});
+
+// --- CLOUD-NATIVE ERROR SIMULATIONS FOR AIOPS ---
+
+// [ERROR-5] MEMORY LEAK: Gradually consumes heap memory.
+// Cloud orchestrators (K8s) will kill the pod once it hits the cgroup limit (OOM).
+// AIOps detects the "Sawtooth" memory pattern.
+let leakArray = [];
+app.get('/api/leak', (req, res) => {
+  logger.warn('AIOps-TEST: Triggering intentional memory leak...');
+  for (let i = 0; i < 10000; i++) {
+    leakArray.push({ timestamp: Date.now(), data: new Array(1000).fill('leak-metadata') });
+  }
+  const memory = process.memoryUsage();
+  res.json({
+    message: "Memory leak in progress.",
+    heapUsed: `${(memory.heapUsed / 1024 / 1024).toFixed(2)} MB`,
+    leakCount: leakArray.length
+  });
+});
+
+// [ERROR-6] LATENCY SPIKE: Artificial delay.
+// Simulates network congestion, noisy neighbor, or cold-start issues.
+// AIOps detects "P99 latency breach" and triggers auto-scaling or traffic shifting.
+app.get('/api/slow', (req, res) => {
+  const delay = Math.floor(Math.random() * 5000) + 2000; // 2-7 seconds
+  logger.warn(`AIOps-TEST: Simulating latent response: ${delay}ms`);
+  setTimeout(() => {
+    res.json({
+      message: `Response delayed by ${delay}ms`,
+      delay,
+      node: process.env.HOSTNAME || 'localhost'
+    });
+  }, delay);
 });
 
 // [ERROR-3] VERBOSE ERROR HANDLER — Sends full stack to client in all envs.
