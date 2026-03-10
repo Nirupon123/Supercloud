@@ -1,0 +1,33 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyc.*
+*.pkl
+*.joblib
+
+# Virtual environments
+env/
+.env/
+.envrc/
+
+# FastAPI / Uvicorn
+
+*.log
+uvicorn.log
+
+# Docker
+
+.dockerignore
+docker-compose.override.yml
+*.env
+
+# IDE
+
+.vscode/
+.idea/
+
+
+
+
+

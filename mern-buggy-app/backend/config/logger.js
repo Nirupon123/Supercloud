@@ -1,42 +1,70 @@
 const winston = require("winston");
 const { OpenTelemetryTransportV3 } = require("@opentelemetry/winston-transport");
 
-// Create Winston logger with OpenTelemetry support
+const serviceName = process.env.OTEL_SERVICE_NAME || "mern-backend";
+
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || "info",
+
   format: winston.format.combine(
-    winston.format.timestamp({
-      format: "YYYY-MM-DD HH:mm:ss",
-    }),
+    winston.format.timestamp(),
     winston.format.errors({ stack: true }),
-    winston.format.splat(),
     winston.format.json()
   ),
+
   defaultMeta: {
-    service: process.env.OTEL_SERVICE_NAME || "mern-buggy-app",
+    service_name: serviceName
   },
+
   transports: [
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.printf(({ level, message, timestamp, ...metadata }) => {
-          let msg = `${timestamp} [${level}]: ${message}`;
-          if (Object.keys(metadata).length > 0) {
-            msg += ` ${JSON.stringify(metadata)}`;
-          }
-          return msg;
-        })
-      ),
-    }),
-    new OpenTelemetryTransportV3(),
-  ],
+    new winston.transports.Console(),
+
+    // Send logs to OpenTelemetry → SigNoz
+    new OpenTelemetryTransportV3({
+      resourceAttributes: {
+        "service.name": serviceName
+      }
+    })
+  ]
 });
 
-// Add a stream for Morgan HTTP logger integration
+
+// Structured HTTP log format for Morgan
 logger.stream = {
   write: (message) => {
-    logger.info(message.trim());
-  },
+    logger.info({
+      event: "http_request",
+      message: message.trim()
+    });
+  }
+};
+
+
+// Helper log functions for better structured logs
+logger.api = (endpoint, status, latency) => {
+  logger.info({
+    event: "api_request",
+    endpoint,
+    status,
+    latency_ms: latency
+  });
+};
+
+logger.errorLog = (error, context = {}) => {
+  logger.error({
+    event: "application_error",
+    message: error.message,
+    stack: error.stack,
+    ...context
+  });
+};
+
+logger.cache = (key, hit) => {
+  logger.info({
+    event: "cache",
+    cache_key: key,
+    hit
+  });
 };
 
 module.exports = logger;

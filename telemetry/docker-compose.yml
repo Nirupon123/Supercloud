@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+
+  telemetry:
+    build: .
+    container_name: smartops-telemetry
+    environment:
+      - CLICKHOUSE_HOST=signoz-clickhouse
+      - CLICKHOUSE_PORT=8123
+      - DETECTOR_URL=http://detector:8001/detect
+      - POLL_INTERVAL=10
+    networks:
+      - smartops-net
+
+networks:
+  smartops-net:
+    external: true
+    name: supercloud_smartops-network

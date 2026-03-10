@@ -1,0 +1,265 @@
+{
+    "version": "2.2",
+    "global_policy": {
+        "auto_remediation_enabled": true,
+        "max_retry_per_incident": 2,
+        "max_consecutive_failures_before_circuit_break": 3,
+        "health_check_required": true,
+        "health_check_timeout_seconds": 90,
+        "canary_enabled": true,
+        "canary_wait_seconds": 60,
+        "stop_execution_on_failure": true
+    },
+    "actions": {
+        "k8s_restart_deployment": {
+            "allowed_params": [
+                "deployment_name"
+            ],
+            "command_template": [
+                "kubectl",
+                "rollout",
+                "restart",
+                "deployment",
+                "{deployment_name}"
+            ]
+        },
+        "k8s_scale_deployment": {
+            "allowed_params": [
+                "deployment_name",
+                "replica_count"
+            ],
+            "command_template": [
+                "kubectl",
+                "scale",
+                "deployment",
+                "{deployment_name}",
+                "--replicas={replica_count}"
+            ]
+        },
+        "k8s_delete_pod": {
+            "allowed_params": [
+                "pod_name"
+            ],
+            "command_template": [
+                "kubectl",
+                "delete",
+                "pod",
+                "{pod_name}"
+            ]
+        },
+        "docker_restart_container": {
+            "allowed_params": [
+                "container_name"
+            ],
+            "command_template": [
+                "docker",
+                "restart",
+                "{container_name}"
+            ]
+        },
+        "systemd_restart_service": {
+            "allowed_params": [
+                "service_name"
+            ],
+            "command_template": [
+                "sudo",
+                "systemctl",
+                "restart",
+                "{service_name}"
+            ]
+        },
+        "journal_vacuum": {
+            "allowed_params": [],
+            "command_template": [
+                "sudo",
+                "journalctl",
+                "--vacuum-time=3d"
+            ]
+        },
+        "docker_system_prune": {
+            "allowed_params": [],
+            "command_template": [
+                "docker",
+                "system",
+                "prune",
+                "-f"
+            ]
+        },
+        "k8s_rollback_deployment": {
+            "allowed_params": [
+                "deployment_name"
+            ],
+            "command_template": [
+                "kubectl",
+                "rollout",
+                "undo",
+                "deployment",
+                "{deployment_name}"
+            ]
+        }
+    },
+    "health_checks": {
+        "kubernetes_deployment": {
+            "command_template": [
+                "kubectl",
+                "rollout",
+                "status",
+                "deployment",
+                "{deployment_name}"
+            ],
+            "success_criteria": {
+                "exit_code": 0
+            }
+        },
+        "docker_container": {
+            "command_template": [
+                "docker",
+                "inspect",
+                "-f",
+                "{{.State.Running}}",
+                "{container_name}"
+            ],
+            "success_criteria": {
+                "stdout_equals": "true"
+            }
+        },
+        "systemd_service": {
+            "command_template": [
+                "systemctl",
+                "is-active",
+                "{service_name}"
+            ],
+            "success_criteria": {
+                "stdout_equals": "active"
+            }
+        }
+    },
+    "issues": {
+        "cpu_high": {
+            "environment": "kubernetes",
+            "condition": {
+                "metric": "cpu_percent",
+                "operator": ">",
+                "threshold": 85
+            },
+            "canary": {
+                "type": "kubernetes",
+                "initial_replicas": 1,
+                "restore_replicas_after_success": true
+            },
+            "steps": [
+                {
+                    "priority": 1,
+                    "action": "k8s_restart_deployment"
+                },
+                {
+                    "priority": 2,
+                    "action": "k8s_scale_deployment"
+                }
+            ],
+            "health_check": "kubernetes_deployment",
+            "rollback": {
+                "action": "k8s_rollback_deployment"
+            }
+        },
+        "memory_high": {
+            "environment": "docker",
+            "condition": {
+                "metric": "memory_percent",
+                "operator": ">",
+                "threshold": 85
+            },
+            "canary": {
+                "type": "docker",
+                "restart_single_instance": true
+            },
+            "steps": [
+                {
+                    "priority": 1,
+                    "action": "docker_restart_container"
+                }
+            ],
+            "health_check": "docker_container",
+            "rollback": null
+        },
+        "disk_high": {
+            "environment": "host",
+            "condition": {
+                "metric": "disk_percent",
+                "operator": ">",
+                "threshold": 90
+            },
+            "canary": {
+                "type": "none"
+            },
+            "steps": [
+                {
+                    "priority": 1,
+                    "action": "journal_vacuum"
+                },
+                {
+                    "priority": 2,
+                    "action": "docker_system_prune"
+                }
+            ],
+            "health_check": null,
+            "rollback": null
+        },
+        "service_error_log": {
+            "environment": "docker",
+            "condition": {
+                "log_level": "ERROR"
+            },
+            "canary": {
+                "type": "docker",
+                "restart_single_instance": true
+            },
+            "steps": [
+                {
+                    "priority": 1,
+                    "action": "docker_restart_container"
+                }
+            ],
+            "health_check": "docker_container",
+            "rollback": null
+        },
+        "log_issue": {
+            "environment": "docker",
+            "condition": {
+                "log_level": "ERROR"
+            },
+            "canary": {
+                "type": "docker",
+                "restart_single_instance": true
+            },
+            "steps": [
+                {
+                    "priority": 1,
+                    "action": "docker_restart_container"
+                }
+            ],
+            "health_check": "docker_container",
+            "rollback": null
+        },
+        "kubernetes_pod_crash": {
+            "environment": "kubernetes",
+            "condition": {
+                "pod_status": "CrashLoopBackOff"
+            },
+            "canary": {
+                "type": "kubernetes",
+                "delete_single_pod": true
+            },
+            "steps": [
+                {
+                    "priority": 1,
+                    "action": "k8s_delete_pod"
+                }
+            ],
+            "health_check": "kubernetes_deployment",
+            "rollback": {
+                "action": "k8s_rollback_deployment"
+            }
+        }
+    }
+}

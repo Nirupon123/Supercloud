@@ -1,0 +1,162 @@
+version: "3.8"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Agent-Service stack — Full AIOps Pipeline
+#
+#  Flow:  telemetry → orchestrator → detector → rca_brain (OPA) → fixer
+#
+#  Services:
+#    detector     – FastAPI :8001  – LLM log triage
+#    orchestrator – FastAPI :8000  – pipeline coordinator
+#    rca_brain    – FastAPI :8002  – LLM root cause + OPA guard
+#    opa          – REST    :8181  – Open Policy Agent (rulebook enforcer)
+#    fixer        – FastAPI :8003  – rulebook-driven remediation
+#    telemetry    – poller         – ClickHouse → orchestrator
+#
+#  Networks:
+#    smartops-net  – inter-service communication (external, shared with SigNoz)
+#    signoz-net    – telemetry → signoz-clickhouse only
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Detector ────────────────────────────────────────────────────────────────
+  detector:
+    build:
+      context: .
+      dockerfile: agents/detector/Dockerfile
+    container_name: smartops-detector
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - smartops-net
+
+  # ── OPA (Open Policy Agent) ─────────────────────────────────────────────────
+  opa:
+    image: openpolicyagent/opa:latest
+    container_name: smartops-opa
+    restart: unless-stopped
+    command: ["run", "--server", "--addr", "0.0.0.0:8181", "/policies"]
+    volumes:
+      - ./opa:/policies
+    ports:
+      - "8181:8181"
+    networks:
+      - smartops-net
+
+  # ── RCA Brain ───────────────────────────────────────────────────────────────
+  rca_brain:
+    build:
+      context: .
+      dockerfile: agents/rca_brain/Dockerfile
+    container_name: smartops-rca-brain
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OPA_URL=http://opa:8181/v1/data/rca/allow
+    ports:
+      - "8002:8002"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      detector:
+        condition: service_healthy
+      opa:
+        condition: service_started
+    networks:
+      - smartops-net
+
+  # ── Fixer ────────────────────────────────────────────────────────────────────
+  fixer:
+    build:
+      context: .
+      dockerfile: agents/fixer/Dockerfile
+    container_name: smartops-fixer
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DRY_RUN=true
+    ports:
+      - "8003:8003"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      rca_brain:
+        condition: service_healthy
+    networks:
+      - smartops-net
+
+  # ── Orchestrator ─────────────────────────────────────────────────────────────
+  orchestrator:
+    build:
+      context: .
+      dockerfile: agents/orchestrator/Dockerfile
+    container_name: smartops-orchestrator
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    depends_on:
+      detector:
+        condition: service_healthy
+      rca_brain:
+        condition: service_healthy
+      fixer:
+        condition: service_healthy
+    networks:
+      - smartops-net
+
+  # ── Telemetry ────────────────────────────────────────────────────────────────
+  telemetry:
+    build:
+      context: ../telemetry
+      dockerfile: Dockerfile
+    container_name: smartops-telemetry
+    restart: unless-stopped
+    environment:
+      - CLICKHOUSE_HOST=signoz-clickhouse
+      - CLICKHOUSE_PORT=8123
+      - ORCHESTRATOR_URL=http://orchestrator:8000/anomaly
+      - POLL_INTERVAL=10
+    depends_on:
+      orchestrator:
+        condition: service_started
+    networks:
+      - smartops-net
+      - signoz-net   # needed to reach signoz-clickhouse
+
+networks:
+  smartops-net:
+    external: true
+    name: supercloud_smartops-network
+  signoz-net:
+    external: true
