@@ -6,7 +6,7 @@ services:
     build: .
     container_name: smartops-telemetry
     environment:
-      - CLICKHOUSE_HOST=signoz-clickhouse
+      - CLICKHOUSE_HOST=host.docker.internal
       - CLICKHOUSE_PORT=8123
       - DETECTOR_URL=http://detector:8001/detect
       - POLL_INTERVAL=10

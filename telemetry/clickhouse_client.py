@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 # Lazy client — created on first use so startup is never blocked
 _client = None
 
+print(CLICKHOUSE_HOST, CLICKHOUSE_PORT)
 
 def _get_client():
     global _client

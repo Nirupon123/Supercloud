@@ -1,6 +1,6 @@
 import os
 
-CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "signoz-clickhouse")
+CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "localhost")
 CLICKHOUSE_PORT = int(os.getenv("CLICKHOUSE_PORT", 8123))
 
 # Now sends to orchestrator, which internally drives detector → rca_brain → fixer
