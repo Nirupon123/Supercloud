@@ -1,0 +1,2 @@
+incident_id,state,detection_time,severity,reason,log_count,first_message,issue_type,rca_allowed
+019cd705-ee3b-766c-aa22-cf5c63d06b7c,resolved,2026-03-10T09:13:36.059715+00:00,unknown,Detector Agent detected potential incidents,2,AIOps-TEST: Triggering intentional memory leak...,memory_high,True

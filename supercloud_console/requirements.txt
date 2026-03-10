@@ -1,0 +1,9 @@
+gradio>=4.0.0
+requests
+pandas
+plotly
+networkx
+matplotlib
+websocket-client
+clickhouse-connect
+python-dotenv

@@ -1,3 +1,6 @@
+# SigNoz deployment (large binary/config files, not part of source)
+signoz/
+
 # Node modules
 node_modules/
 **/node_modules/

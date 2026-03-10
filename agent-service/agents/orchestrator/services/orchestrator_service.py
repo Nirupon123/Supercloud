@@ -91,6 +91,54 @@ async def receive_event(event: EventIn):
 async def status():
     return orchestrator.get_status()
 
+
+@app.get("/incidents")
+async def list_incidents():
+    """
+    Return all active incidents tracked by the orchestrator.
+    Used by the SuperCloud Console frontend.
+    """
+    incidents = orchestrator.active_incidents
+    result = []
+    for incident_id, inc in incidents.items():
+        params = inc.get("detection_result", {}).get("parameters", {})
+        logs_for_rca = params.get("logs_for_rca", [])
+        first_log = logs_for_rca[0] if logs_for_rca else {}
+        result.append({
+            "incident_id":    incident_id,
+            "state":          inc.get("state"),
+            "detection_time": inc.get("detection_time"),
+            "severity":       params.get("severity", "unknown"),
+            "reason":         params.get("reason", ""),
+            "log_count":      len(logs_for_rca),
+            "first_message":  first_log.get("message", ""),
+            "issue_type":     inc.get("rca_result", {}).get("parameters", {}).get("issue_type", "pending"),
+            "rca_allowed":    inc.get("rca_result", {}).get("action") == "rca_complete",
+        })
+    # Most recent first
+    result.sort(key=lambda x: x["detection_time"], reverse=True)
+    return result
+
+
+@app.get("/metrics")
+async def get_metrics():
+    """
+    Return a simple per-incident metrics summary.
+    """
+    incidents = orchestrator.active_incidents
+    metrics = []
+    for incident_id, inc in incidents.items():
+        metrics.append({
+            "incident_id":    incident_id,
+            "state":          inc.get("state"),
+            "detection_time": inc.get("detection_time"),
+            "service":        "mern-backend",
+            "severity":       inc.get("detection_result", {}).get("parameters", {}).get("severity", "unknown"),
+            "cpu":            0,
+            "memory":         0,
+        })
+    return metrics
+
 if __name__ == "__main__":
     uvicorn.run(
         "orchestrator_service:app",

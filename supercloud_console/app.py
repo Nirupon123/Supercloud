@@ -1,143 +1,196 @@
 import gradio as gr
 import pandas as pd
 
-from api import *
-from charts import *
-from logs import *
-from dependency import *
+from api import (
+    get_incidents, get_metrics, get_rca, run_remediation,
+    check_opa_policy, get_pipeline_status, poll_pipeline_events
+)
+from charts import (
+    incident_severity_chart, incident_timeline_chart,
+    cpu_chart, memory_chart
+)
+from logs import get_logs
+from dependency import generate_dependency_graph
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 def load_incidents():
-
     data = get_incidents()
-
-    df = pd.DataFrame(data)
-
-    chart = incident_severity_chart(data)
-
-    return df, chart
+    df   = pd.DataFrame(data) if data and "error" not in data[0] else pd.DataFrame()
+    sev  = incident_severity_chart(data)
+    tl   = incident_timeline_chart(data)
+    return df, sev, tl
 
 
 def load_metrics():
-
     metrics = get_metrics()
-
-    cpu = cpu_chart(metrics)
-    mem = memory_chart(metrics)
-
-    return cpu, mem
+    return cpu_chart(metrics), memory_chart(metrics)
 
 
-def rca_analysis(row):
-
-    result = get_rca(row)
-
-    return result
-
-
-def remediate(service):
-
-    return run_remediation(service)
+def load_pipeline_status():
+    statuses = get_pipeline_status()
+    rows = [[svc, status] for svc, status in statuses.items()]
+    return pd.DataFrame(rows, columns=["Service", "Status"])
 
 
-def export_audit():
-
-    data = get_incidents()
-
-    df = pd.DataFrame(data)
-
-    path = "audit_history.csv"
-
-    df.to_csv(path, index=False)
-
-    return path
+def refresh_pipeline_events():
+    return poll_pipeline_events(last_n=30)
 
 
-def query_logs(service):
+def run_manual_rca(incident_json: dict):
+    return get_rca(incident_json)
 
+
+def run_manual_fix(incident_id: str, issue_type: str, container: str):
+    return run_remediation(incident_id, issue_type, container)
+
+
+def run_opa_check(issue_type: str, environment: str, confidence: float):
+    return check_opa_policy(issue_type, environment, confidence)
+
+
+def query_logs(service: str):
     df = get_logs(service)
-
     return df
 
 
-def dependency_graph():
-
-    return generate_dependency_graph()
-
+# ── Gradio UI ─────────────────────────────────────────────────────────────────
 
 with gr.Blocks(title="SuperCloud AIOps Console") as app:
 
-    gr.Markdown("# SuperCloud AIOps Platform")
+    gr.Markdown("""
+    # 🚀 SuperCloud AIOps Console
+    **Pipeline:** `Telemetry → Orchestrator → Detector → RCA Brain (OPA) → Fixer`
+    """)
 
-    with gr.Tab("Incident Command Center"):
+    # ── Tab 1: Service Health (status bar) ───────────────────────────────────
+    with gr.Tab("🟢 Service Health"):
+        gr.Markdown("### Live status of all pipeline services")
+        status_table = gr.Dataframe(
+            headers=["Service", "Status"],
+            interactive=False
+        )
+        with gr.Row():
+            refresh_status_btn = gr.Button("Refresh Status", variant="primary")
+        refresh_status_btn.click(load_pipeline_status, outputs=status_table)
+        app.load(load_pipeline_status, outputs=status_table)   # load on open
 
-        incident_table = gr.Dataframe()
+    # ── Tab 2: Live Pipeline Stream ──────────────────────────────────────────
+    with gr.Tab("⚡ Live Pipeline"):
+        gr.Markdown("""
+        ### Real-time pipeline events
+        Shows events flowing through: **Detector → RCA Brain → OPA → Fixer**
+        > Trigger an incident from your MERN app (`/api/leak` or `/api/slow`) then click **Refresh**.
+        """)
+        pipeline_output = gr.Textbox(
+            label="Pipeline Events (most recent)",
+            lines=30,
+            max_lines=50,
+            interactive=False,
+        )
+        refresh_pipeline_btn = gr.Button("🔄 Refresh Events", variant="primary")
+        refresh_pipeline_btn.click(refresh_pipeline_events, outputs=pipeline_output)
 
-        severity_chart = gr.Plot()
+    # ── Tab 3: Incident Command Center ───────────────────────────────────────
+    with gr.Tab("🚨 Incidents"):
+        gr.Markdown("### All incidents tracked by the Orchestrator")
+        incident_table = gr.Dataframe(interactive=False)
+        with gr.Row():
+            sev_chart = gr.Plot(label="Severity Breakdown")
+            tl_chart  = gr.Plot(label="Incident Timeline")
+        refresh_inc_btn = gr.Button("🔄 Refresh Incidents", variant="primary")
+        refresh_inc_btn.click(load_incidents, outputs=[incident_table, sev_chart, tl_chart])
 
-        refresh = gr.Button("Refresh Incidents")
+    # ── Tab 4: Trigger Issue (manual frontend-driven incident) ───────────────
+    with gr.Tab("🔧 Trigger Issue"):
+        gr.Markdown("""
+        ### Manually trigger an RCA + Fix cycle
+        Paste a JSON payload representing the incident, or fill the quick form below.
+        """)
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("#### Manual RCA")
+                rca_input  = gr.JSON(label="Incident Payload", value={
+                    "incident_id":   "manual-001",
+                    "severity":      "high",
+                    "anomaly_score": 0.9,
+                    "logs": [{"timestamp": "", "message": "AIOps-TEST: Triggering intentional memory leak...", "severity": "warn"}],
+                    "reason": "Manual trigger from SuperCloud Console"
+                })
+                rca_btn    = gr.Button("🧠 Run RCA", variant="primary")
+                rca_output = gr.JSON(label="RCA Result")
+                rca_btn.click(run_manual_rca, inputs=rca_input, outputs=rca_output)
 
-        refresh.click(load_incidents, outputs=[incident_table, severity_chart])
+            with gr.Column():
+                gr.Markdown("#### Manual Fixer")
+                inc_id_in  = gr.Textbox(label="Incident ID",    value="manual-001")
+                issue_in   = gr.Dropdown(
+                    label="Issue Type",
+                    choices=["memory_high", "cpu_high", "disk_high", "service_error_log", "log_issue", "kubernetes_pod_crash"],
+                    value="memory_high"
+                )
+                container_in = gr.Textbox(label="Container Name", value="mern-backend")
+                fix_btn      = gr.Button("🔨 Run Fixer", variant="secondary")
+                fix_output   = gr.JSON(label="Fixer Result")
+                fix_btn.click(run_manual_fix, inputs=[inc_id_in, issue_in, container_in], outputs=fix_output)
 
+    # ── Tab 5: OPA Policy Guard ───────────────────────────────────────────────
+    with gr.Tab("🔏 OPA Policy"):
+        gr.Markdown("""
+        ### Test the OPA Rulebook Guard
+        Check whether a given issue/environment/confidence would be **allowed** through to the Fixer.
+        """)
+        with gr.Row():
+            opa_issue = gr.Dropdown(
+                label="Issue Type",
+                choices=["memory_high", "cpu_high", "disk_high", "service_error_log", "log_issue", "kubernetes_pod_crash", "unknown_issue"],
+                value="memory_high"
+            )
+            opa_env = gr.Dropdown(
+                label="Environment",
+                choices=["docker", "kubernetes", "systemd", "host", "invalid_env"],
+                value="docker"
+            )
+            opa_conf = gr.Slider(label="Confidence", minimum=0.0, maximum=1.0, step=0.05, value=0.8)
+        opa_btn    = gr.Button("✅ Check Policy", variant="primary")
+        opa_result = gr.JSON(label="OPA Decision")
+        opa_btn.click(run_opa_check, inputs=[opa_issue, opa_env, opa_conf], outputs=opa_result)
 
-    with gr.Tab("Service Health"):
+    # ── Tab 6: Logs Explorer ─────────────────────────────────────────────────
+    with gr.Tab("📋 Logs Explorer"):
+        gr.Markdown("### Incident logs from ClickHouse (keyword-filtered)")
+        service_input = gr.Textbox(label="Service Name (optional, leave blank for all)", value="")
+        query_btn     = gr.Button("Fetch Logs", variant="primary")
+        logs_output   = gr.Dataframe(interactive=False)
+        query_btn.click(query_logs, inputs=service_input, outputs=logs_output)
 
-        cpu_plot = gr.Plot()
-        mem_plot = gr.Plot()
-
-        refresh_metrics = gr.Button("Load Metrics")
-
-        refresh_metrics.click(load_metrics, outputs=[cpu_plot, mem_plot])
-
-
-    with gr.Tab("Root Cause Analysis"):
-
-        incident_input = gr.JSON()
-
-        analyze_btn = gr.Button("Run RCA")
-
-        rca_output = gr.JSON()
-
-        analyze_btn.click(rca_analysis, inputs=incident_input, outputs=rca_output)
-
-
-    with gr.Tab("Remediation"):
-
-        service = gr.Textbox(label="Service Name")
-
-        run = gr.Button("Run Fix")
-
-        result = gr.JSON()
-
-        run.click(remediate, inputs=service, outputs=result)
-
-
-    with gr.Tab("Logs Explorer"):
-
-        service_logs = gr.Textbox(label="Service")
-
-        query = gr.Button("Fetch Logs")
-
-        logs_output = gr.Dataframe()
-
-        query.click(query_logs, inputs=service_logs, outputs=logs_output)
-
-
-    with gr.Tab("Dependency Map"):
-
+    # ── Tab 7: Dependency Map ─────────────────────────────────────────────────
+    with gr.Tab("🗺️ Architecture"):
+        gr.Markdown("### Pipeline Dependency Graph")
         graph = gr.Plot()
+        load_graph_btn = gr.Button("Show Architecture", variant="secondary")
+        load_graph_btn.click(generate_dependency_graph, outputs=graph)
 
-        load_graph = gr.Button("Show Architecture")
+    # ── Tab 8: Audit / Export ─────────────────────────────────────────────────
+    with gr.Tab("📤 Audit Export"):
+        gr.Markdown("### Download incident history as CSV")
+        export_btn = gr.Button("📥 Download CSV", variant="secondary")
+        file_out   = gr.File()
 
-        load_graph.click(dependency_graph, outputs=graph)
+        def export_audit():
+            data = get_incidents()
+            df   = pd.DataFrame(data)
+            path = "audit_history.csv"
+            df.to_csv(path, index=False)
+            return path
+
+        export_btn.click(export_audit, outputs=file_out)
 
 
-    with gr.Tab("Audit Dashboard"):
-
-        export = gr.Button("Download Incident History")
-
-        file = gr.File()
-
-        export.click(export_audit, outputs=file)
-
-
-app.launch(server_port=7860)
+app.launch(
+    server_port=7860,
+    share=False,
+    theme=gr.themes.Soft(),
+    css=".gradio-container { max-width: 1400px !important; }"
+)
